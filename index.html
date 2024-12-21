@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weekly Schedule Picker</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background-color: #f4f4f9;
+        margin: 0;
+      }
+      h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #333;
+      }
+      .container {
+        margin-top: 5vh;
+        margin-bottom: 5vh;
+        margin-left: 10vw;
+        margin-right: 10vw;
+        height: 90vh;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+      .week-navigation {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .nav-button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+      .nav-button:hover {
+        background-color: #0056b3;
+      }
+      #current-week {
+        font-weight: bold;
+        font-size: 16px;
+        color: #333;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        background-color: white;
+      }
+      th {
+        text-align: center;
+        padding: 10px;
+        font-size: 16px;
+        color: white;
+        font-weight: bold;
+      }
+      .circle-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .circle {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background-color: transparent;
+        color: #333;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .circle.today {
+        background-color: #ffdd57;
+        color: #333;
+      }
+      .circle .day {
+        font-size: 12px;
+      }
+      .circle .date {
+        font-size: 16px;
+        font-weight: normal;
+      }
+      td {
+        text-align: center;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        font-size: 14px;
+      }
+      .slot {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        font-size: 0.75em;
+        margin: auto;
+        width: 10vw;
+        height: 50px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        cursor: pointer;
+      }
+      .slot .time {
+        font-size: 1.5em;
+        font-weight: bold;
+      }
+      .slot .availability {
+        font-size: 0.9em;
+      }
+      .slot:hover {
+        background-color: #0056b3;
+      }
+      .slot.fully-booked {
+        background-color: #ff4d4d;
+        cursor: not-allowed;
+      }
+      .slot.closed {
+        background-color: #ccc;
+        cursor: not-allowed;
+        color: #666;
+      }
+      .spinner {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 9999;
+        display: none;
+      }
+      .spinner img {
+        width: 50px;
+      }
+      .no-slots {
+        color: #999;
+        font-size: 12px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="week-navigation">
+        <button id="prev-week" class="nav-button">&lt;</button>
+        <span id="current-week">Loading...</span>
+        <button id="next-week" class="nav-button">&gt;</button>
+      </div>
+      <div class="spinner" id="loading-spinner">
+        <img src="https://i.gifer.com/ZZ5H.gif" alt="Loading..." />
+      </div>
+      <table>
+        <thead>
+          <tr id="date-headers"></tr>
+        </thead>
+        <tbody id="time-slots"></tbody>
+      </table>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const dateHeaders = document.getElementById("date-headers");
+        const timeSlots = document.getElementById("time-slots");
+        const currentWeekLabel = document.getElementById("current-week");
+        const loadingSpinner = document.getElementById("loading-spinner");
+
+        let currentWeekStart = getMonday(new Date());
+
+        function getMonday(date) {
+          const monday = new Date(date);
+          monday.setDate(monday.getDate() - monday.getDay() + 1);
+          return monday;
+        }
+
+        function formatDate(date) {
+          return date.toISOString().split("T")[0];
+        }
+
+        async function loadWeek(startDate) {
+          try {
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+
+            loadingSpinner.style.display = "block";
+
+            google.script.run
+              .withSuccessHandler((schedule) => {
+                console.log("Weekly Schedule Data:", schedule);
+                updateUI(schedule, startDate, endDate);
+              })
+              .withFailureHandler((error) => {
+                console.error("Error fetching schedule:", error);
+              })
+              .getWeeklyScheduleForFrontend(
+                formatDate(startDate),
+                formatDate(endDate)
+              );
+          } catch (error) {
+            console.error("Error in loadWeek:", error);
+          } finally {
+            loadingSpinner.style.display = "none";
+          }
+        }
+
+        function updateUI(data, startDate, endDate) {
+          currentWeekLabel.textContent = `${startDate.toDateString()} - ${endDate.toDateString()}`;
+          dateHeaders.innerHTML = "";
+          timeSlots.innerHTML = "";
+
+          data.summary.forEach(({ date, day }) => {
+            const th = document.createElement("th");
+            const isToday = new Date(date).toDateString() === new Date().toDateString();
+            th.innerHTML = `
+              <div class="circle-container">
+                <div class="circle ${isToday ? "today" : ""}">
+                  <span class="day">${day.slice(0, 3).toUpperCase()}</span>
+                  <span class="date">${new Date(date).getDate()}</span>
+                </div>
+              </div>`;
+            dateHeaders.appendChild(th);
+          });
+
+          const maxSlots = Math.max(
+            ...Object.values(data.slots).map((daySlots) => daySlots.length)
+          );
+          for (let i = 0; i < maxSlots; i++) {
+            const row = document.createElement("tr");
+            data.summary.forEach(({ date }) => {
+              const cell = document.createElement("td");
+              const slot = data.slots[date]?.[i];
+              if (slot) {
+                const slotElement = document.createElement("a");
+                slotElement.className = "slot";
+                slotElement.innerHTML = `<div class="time">${slot.time}</div>
+                                         <div class="availability">${slot.available}</div>`;
+
+                if (slot.available === "closed") {
+                  slotElement.classList.add("closed");
+                  slotElement.href = "#";
+                } else if (slot.available === "fully booked") {
+                  slotElement.classList.add("fully-booked");
+                  slotElement.href = "#";
+                }
+
+                cell.appendChild(slotElement);
+              } else {
+                cell.innerHTML = '<span class="no-slots">-</span>';
+              }
+              row.appendChild(cell);
+            });
+            timeSlots.appendChild(row);
+          }
+        }
+
+        document.getElementById("prev-week").addEventListener("click", () => {
+          currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+          loadWeek(currentWeekStart);
+        });
+
+        document.getElementById("next-week").addEventListener("click", () => {
+          currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+          loadWeek(currentWeekStart);
+        });
+
+        loadWeek(currentWeekStart);
+      });
+    </script>
+  </body>
+</html>
